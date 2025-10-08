@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Trading Bot Monitor</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 font-sans p-6">
+    <div class="w-full">
+        <h1 class="text-2xl font-bold text-gray-800 mb-4">Trading Bot Monitor (Latest Entry Per Token)</h1>
+        <p class="text-gray-600 mb-4">Updates every 2s. Bot reads real Binance Testnet data (timestamps/prices match market). Accuracy ~60% (backtests). Run 1h for ~600 entries (10 tokens). Total Profit reflects all positions. Market Size shows position value ($).</p>
+        <p id="lastUpdated" class="text-gray-600 mb-4">Last Updated: Waiting...</p>
+        <div class="overflow-x-auto">
+            <table id="cacheTable" class="w-full bg-white shadow-md rounded-lg">
+                <thead>
+                    <tr class="bg-gray-200 text-gray-700 text-sm">
+                        <th class="py-3 px-4 text-left">Timestamp</th>
+                        <th class="py-3 px-4 text-left">Token</th>
+                        <th class="py-3 px-4 text-left">Signal</th>
+                        <th class="py-3 px-4 text-left">Open Position</th>
+                        <th class="py-3 px-4 text-left">First Range to Open</th>
+                        <th class="py-3 px-4 text-left">Stop Loss</th>
+                        <th class="py-3 px-4 text-left">Take Profit</th>
+                        <th class="py-3 px-4 text-left">Leverage</th>
+                        <th class="py-3 px-4 text-left">Confidence %</th>
+                        <th class="py-3 px-4 text-left">Market Size</th>
+                        <th class="py-3 px-4 text-left">Moving Listing</th>
+                        <th class="py-3 px-4 text-left">Reasons</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+        <p id="totalProfit" class="text-gray-600 mt-4">Total Profit: Calculating...</p>
+    </div>
+    <script>
+        let lastLines = [];
+        function updateTable() {
+            fetch('data/cache.txt')
+                .then(response => {
+                    if (!response.ok) throw new Error('Cache file not found');
+                    return response.text();
+                })
+                .then(text => {
+                    const lines = text.trim().split('\n').filter(line => line && line.includes('|'));
+                    if (lines.length === 0) {
+                        console.warn('Cache file is empty');
+                        document.querySelector('#lastUpdated').textContent = 'Last Updated: Cache file is empty';
+                        return;
+                    }
+                    const latestByToken = {};
+                    lines.forEach(line => {
+                        const parts = line.split('|');
+                        if (parts.length < 12) {
+                            console.warn(`Skipping malformed cache line: ${line}`);
+                            return;
+                        }
+                        const [timestamp, token, signal] = parts;
+                        if (!latestByToken[token] || new Date(timestamp) > new Date(latestByToken[token].split('|')[0])) {
+                            latestByToken[token] = line;
+                        }
+                    });
+                    const sortedLines = Object.values(latestByToken)
+                        .sort((a, b) => new Date(b.split('|')[0]) - new Date(a.split('|')[0]))
+                        .slice(0, 10);
+                    const tbody = document.querySelector('#cacheTable tbody');
+                    tbody.innerHTML = '';
+                    sortedLines.forEach((line, index) => {
+                        const parts = line.split('|');
+                        if (parts.length < 12) return;
+                        const [timestamp, token, signal, open, range, sl, tp, lev, conf, marketSize, moving, reasons] = parts;
+                        const isNew = !lastLines.includes(line);
+                        const signalClass = signal === 'BUY' ? 'bg-green-100 text-green-700' : signal === 'SELL' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-700';
+                        const row = `<tr class="${isNew ? 'bg-green-50' : ''} ${signalClass} hover:bg-gray-50">
+                            <td class="py-2 px-4">${timestamp}</td>
+                            <td class="py-2 px-4">${token}</td>
+                            <td class="py-2 px-4 font-semibold">${signal}</td>
+                            <td class="py-2 px-4">${open}</td>
+                            <td class="py-2 px-4">${range}</td>
+                            <td class="py-2 px-4">${sl}</td>
+                            <td class="py-2 px-4">${tp}</td>
+                            <td class="py-2 px-4">${lev}</td>
+                            <td class="py-2 px-4">${conf}</td>
+                            <td class="py-2 px-4">$${parseFloat(marketSize.split('=')[1]).toFixed(2)}</td>
+                            <td class="py-2 px-4">${moving}</td>
+                            <td class="py-2 px-4">${reasons}</td>
+                        </tr>`;
+                        tbody.innerHTML += row;
+                    });
+                    lastLines = sortedLines;
+                    document.querySelector('#lastUpdated').textContent = `Last Updated: ${new Date().toLocaleString()}`;
+                })
+                .catch(error => {
+                    console.error('Error loading cache:', error);
+                    document.querySelector('#lastUpdated').textContent = `Last Updated: Error - ${error.message}`;
+                });
+
+            fetch('logs/market_analysis.log')
+                .then(res => {
+                    if (!res.ok) throw new Error('Log file not found');
+                    return res.text();
+                })
+                .then(log => {
+                    const profitLine = log.split('\n').reverse().find(line => line.includes('Total Profit'));
+                    const profit = profitLine ? profitLine.match(/Total Profit: \$([-0-9.]+)/)[1] : 'Unknown';
+                    document.querySelector('#totalProfit').textContent = `Total Profit: $${profit}`;
+                })
+                .catch(error => {
+                    console.error('Error loading log:', error);
+                    document.querySelector('#totalProfit').textContent = 'Total Profit: Error - Log file not found';
+                });
+        }
+
+        updateTable();
+        setInterval(updateTable, 2000);
+    </script>
+</body>
+</html>

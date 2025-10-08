@@ -1,0 +1,21 @@
+# Python virtual environment
+trading_bot_env/
+venv/
+
+# Environment variables
+.env
+
+# Cache and log files
+data/cache.txt
+logs/
+
+# Python bytecode
+__pycache__/
+*.pyc
+
+# IDE files
+.vscode/
+.idea/
+
+# macOS
+.DS_Store
