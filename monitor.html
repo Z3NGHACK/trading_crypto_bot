@@ -1,41 +1,207 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Trading Bot Monitor</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .blink-new {
+            animation: blink 2s ease-in-out 3;
+        }
+
+        @keyframes blink {
+
+            0%,
+            100% {
+                background-color: transparent;
+            }
+
+            50% {
+                background-color: #dcfce7;
+            }
+        }
+
+        .signal-buy {
+            background-color: #dcfce7;
+            color: #166534;
+        }
+
+        .signal-sell {
+            background-color: #fee2e2;
+            color: #dc2626;
+        }
+
+        .signal-hold {
+            background-color: #f3f4f6;
+            color: #6b7280;
+        }
+    </style>
 </head>
-<body class="bg-gray-100 font-sans p-6">
-    <div class="w-full">
-        <h1 class="text-2xl font-bold text-gray-800 mb-4">Trading Bot Monitor (Latest Entry Per Token)</h1>
-        <p class="text-gray-600 mb-4">Updates every 2s. Bot reads real Binance Testnet data (timestamps/prices match market). Accuracy ~60% (backtests). Run 1h for ~600 entries (10 tokens). Total Profit reflects all positions. Market Size shows position value ($).</p>
-        <p id="lastUpdated" class="text-gray-600 mb-4">Last Updated: Waiting...</p>
-        <div class="overflow-x-auto">
-            <table id="cacheTable" class="w-full bg-white shadow-md rounded-lg">
-                <thead>
-                    <tr class="bg-gray-200 text-gray-700 text-sm">
-                        <th class="py-3 px-4 text-left">Timestamp</th>
-                        <th class="py-3 px-4 text-left">Token</th>
-                        <th class="py-3 px-4 text-left">Signal</th>
-                        <th class="py-3 px-4 text-left">Open Position</th>
-                        <th class="py-3 px-4 text-left">First Range to Open</th>
-                        <th class="py-3 px-4 text-left">Stop Loss</th>
-                        <th class="py-3 px-4 text-left">Take Profit</th>
-                        <th class="py-3 px-4 text-left">Leverage</th>
-                        <th class="py-3 px-4 text-left">Confidence %</th>
-                        <th class="py-3 px-4 text-left">Market Size</th>
-                        <th class="py-3 px-4 text-left">Moving Listing</th>
-                        <th class="py-3 px-4 text-left">Reasons</th>
-                    </tr>
-                </thead>
-                <tbody></tbody>
-            </table>
+
+<body class="bg-gray-50 font-sans p-4">
+    <div class="max-w-7xl mx-auto">
+        <!-- Header -->
+        <div class="bg-white rounded-lg shadow-sm p-6 mb-6">
+            <div class="flex justify-between items-center">
+                <div>
+                    <h1 class="text-3xl font-bold text-gray-800">Trading Bot Monitor</h1>
+                    <p class="text-gray-600 mt-2">Real-time trading signals and portfolio performance</p>
+                </div>
+                <div class="text-right">
+                    <div id="status"
+                        class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
+                        <span class="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
+                        LIVE
+                    </div>
+                    <p id="lastUpdated" class="text-sm text-gray-500 mt-1">Last Updated: <span
+                            id="updateTime">Waiting...</span></p>
+                </div>
+            </div>
+
+            <!-- Stats Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mt-6">
+                <div class="bg-blue-50 rounded-lg p-4">
+                    <div class="text-blue-600 text-sm font-medium">Total Pairs</div>
+                    <div class="text-2xl font-bold text-blue-800" id="totalPairs">10</div>
+                </div>
+                <div class="bg-green-50 rounded-lg p-4">
+                    <div class="text-green-600 text-sm font-medium">Active Signals</div>
+                    <div class="text-2xl font-bold text-green-800" id="activeSignals">0</div>
+                </div>
+                <div class="bg-purple-50 rounded-lg p-4">
+                    <div class="text-purple-600 text-sm font-medium">Open Positions</div>
+                    <div class="text-2xl font-bold text-purple-800" id="openPositions">0</div>
+                </div>
+                <div class="bg-orange-50 rounded-lg p-4">
+                    <div class="text-orange-600 text-sm font-medium">Total Profit</div>
+                    <div class="text-2xl font-bold text-orange-800" id="totalProfit">$0.00</div>
+                </div>
+            </div>
         </div>
-        <p id="totalProfit" class="text-gray-600 mt-4">Total Profit: Calculating...</p>
+
+        <!-- Trading Signals Table -->
+        <div class="bg-white rounded-lg shadow-sm overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-200">
+                <h2 class="text-xl font-semibold text-gray-800">Latest Trading Signals</h2>
+                <p class="text-gray-600 text-sm mt-1">Showing latest signal for each trading pair (updates every 2
+                    seconds)</p>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Timestamp</th>
+                            <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Token</th>
+                            <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Signal</th>
+                            <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Price</th>
+                            <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Range</th>
+                            <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Stop Loss</th>
+                            <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Take Profit</th>
+                            <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Leverage</th>
+                            <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Confidence</th>
+                            <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Market Size</th>
+                            <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Price Change</th>
+                            <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Reasons</th>
+                        </tr>
+                    </thead>
+                    <tbody id="signalsTable" class="bg-white divide-y divide-gray-200">
+                        <!-- Data will be populated by JavaScript -->
+                        <tr>
+                            <td colspan="12" class="py-8 text-center text-gray-500">
+                                <div class="flex justify-center items-center">
+                                    <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                                    <span class="ml-2">Loading trading data...</span>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Bot Information -->
+        <div class="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="bg-white rounded-lg shadow-sm p-6">
+                <h3 class="text-lg font-semibold text-gray-800 mb-4">Bot Configuration</h3>
+                <div class="space-y-3">
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">Trading Mode:</span>
+                        <span class="font-medium" id="configMode">Sandbox (Testnet)</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">Timeframe:</span>
+                        <span class="font-medium" id="configTimeframe">15m</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">Leverage:</span>
+                        <span class="font-medium" id="configLeverage">5x</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">Max Positions:</span>
+                        <span class="font-medium" id="configMaxPositions">3</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-lg shadow-sm p-6">
+                <h3 class="text-lg font-semibold text-gray-800 mb-4">System Status</h3>
+                <div class="space-y-3">
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">Bot Status:</span>
+                        <span class="font-medium text-green-600" id="systemStatus">Running</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">Last Analysis:</span>
+                        <span class="font-medium" id="lastAnalysis">-</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">Cache Entries:</span>
+                        <span class="font-medium" id="cacheEntries">0</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">Update Frequency:</span>
+                        <span class="font-medium">Every 2 seconds</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="mt-6 text-center text-gray-500 text-sm">
+            <p>Trading Bot Monitor • Data from Binance Testnet • Updates every 2 seconds</p>
+            <p class="mt-1">Accuracy ~60% (backtests) • Market Size shows position value with leverage</p>
+        </div>
     </div>
+
     <script>
-        let lastLines = [];
-        function updateTable() {
+        let previousSignals = new Set();
+        let lastCacheCount = 0;
+
+        // Configuration (should match your bot settings)
+        const CONFIG = {
+            tradingPairs: ['BTC/USDT', 'ETH/USDT', 'SOL/USDT', 'ADA/USDT', 'BNB/USDT',
+                'XRP/USDT', 'DOGE/USDT', 'LINK/USDT', 'DOT/USDT', 'UNI/USDT'],
+            leverage: 5,
+            maxPositions: 3,
+            timeframe: '15m'
+        };
+
+        function updateDashboard() {
             fetch('data/cache.txt')
                 .then(response => {
                     if (!response.ok) throw new Error('Cache file not found');
@@ -43,76 +209,199 @@
                 })
                 .then(text => {
                     const lines = text.trim().split('\n').filter(line => line && line.includes('|'));
-                    if (lines.length === 0) {
-                        console.warn('Cache file is empty');
-                        document.querySelector('#lastUpdated').textContent = 'Last Updated: Cache file is empty';
-                        return;
-                    }
-                    const latestByToken = {};
-                    lines.forEach(line => {
-                        const parts = line.split('|');
-                        if (parts.length < 12) {
-                            console.warn(`Skipping malformed cache line: ${line}`);
-                            return;
-                        }
-                        const [timestamp, token, signal] = parts;
-                        if (!latestByToken[token] || new Date(timestamp) > new Date(latestByToken[token].split('|')[0])) {
-                            latestByToken[token] = line;
-                        }
-                    });
-                    const sortedLines = Object.values(latestByToken)
-                        .sort((a, b) => new Date(b.split('|')[0]) - new Date(a.split('|')[0]))
-                        .slice(0, 10);
-                    const tbody = document.querySelector('#cacheTable tbody');
-                    tbody.innerHTML = '';
-                    sortedLines.forEach((line, index) => {
-                        const parts = line.split('|');
-                        if (parts.length < 12) return;
-                        const [timestamp, token, signal, open, range, sl, tp, lev, conf, marketSize, moving, reasons] = parts;
-                        const isNew = !lastLines.includes(line);
-                        const signalClass = signal === 'BUY' ? 'bg-green-100 text-green-700' : signal === 'SELL' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-700';
-                        const row = `<tr class="${isNew ? 'bg-green-50' : ''} ${signalClass} hover:bg-gray-50">
-                            <td class="py-2 px-4">${timestamp}</td>
-                            <td class="py-2 px-4">${token}</td>
-                            <td class="py-2 px-4 font-semibold">${signal}</td>
-                            <td class="py-2 px-4">${open}</td>
-                            <td class="py-2 px-4">${range}</td>
-                            <td class="py-2 px-4">${sl}</td>
-                            <td class="py-2 px-4">${tp}</td>
-                            <td class="py-2 px-4">${lev}</td>
-                            <td class="py-2 px-4">${conf}</td>
-                            <td class="py-2 px-4">$${parseFloat(marketSize.split('=')[1]).toFixed(2)}</td>
-                            <td class="py-2 px-4">${moving}</td>
-                            <td class="py-2 px-4">${reasons}</td>
-                        </tr>`;
-                        tbody.innerHTML += row;
-                    });
-                    lastLines = sortedLines;
-                    document.querySelector('#lastUpdated').textContent = `Last Updated: ${new Date().toLocaleString()}`;
+                    updateSignalsTable(lines);
+                    updateStats(lines);
+                    updateLastUpdated();
                 })
                 .catch(error => {
                     console.error('Error loading cache:', error);
-                    document.querySelector('#lastUpdated').textContent = `Last Updated: Error - ${error.message}`;
+                    document.getElementById('updateTime').textContent = 'Error loading data';
                 });
 
+            // Update profit from log file
+            updateProfitFromLog();
+        }
+
+        function updateSignalsTable(lines) {
+            const latestByToken = {};
+            const currentSignals = new Set();
+
+            // Process each line and get latest signal per token
+            lines.forEach(line => {
+                const parts = line.split('|');
+                if (parts.length < 12) return;
+
+                const [timestamp, token, signal] = parts;
+                const signalKey = `${token}-${timestamp}`;
+                currentSignals.add(signalKey);
+
+                // Keep only the latest signal for each token
+                if (!latestByToken[token] || new Date(timestamp) > new Date(latestByToken[token].split('|')[0])) {
+                    latestByToken[token] = line;
+                }
+            });
+
+            // Sort by timestamp (newest first) and limit to configured pairs
+            const sortedSignals = CONFIG.tradingPairs
+                .map(token => latestByToken[token])
+                .filter(signal => signal)
+                .sort((a, b) => new Date(b.split('|')[0]) - new Date(a.split('|')[0]));
+
+            const tbody = document.getElementById('signalsTable');
+            tbody.innerHTML = '';
+
+            if (sortedSignals.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="12" class="py-8 text-center text-gray-500">
+                            No trading signals yet. The bot is analyzing markets...
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            // Add rows for each signal
+            sortedSignals.forEach(line => {
+                const parts = line.split('|');
+                const [timestamp, token, signal, open, range, sl, tp, lev, conf, marketSize, moving, reasons] = parts;
+
+                // Extract values from formatted strings
+                const openPrice = open.replace('Open=', '');
+                const rangeVal = range.replace('Range=', '');
+                const stopLoss = sl.replace('SL=', '');
+                const takeProfit = tp.replace('TP=', '');
+                const leverage = lev.replace('Leverage=', '').replace('x', '');
+                const confidence = conf.replace('Conf=', '').replace('%', '');
+                const marketSizeVal = marketSize.replace('MarketSize=', '');
+                const movingInfo = moving.replace('Moving=', '');
+
+                const signalKey = `${token}-${timestamp}`;
+                const isNew = !previousSignals.has(signalKey);
+
+                const signalClass = signal === 'BUY' ? 'signal-buy' :
+                    signal === 'SELL' ? 'signal-sell' : 'signal-hold';
+
+                const rowClass = isNew ? 'blink-new' : '';
+
+                const row = `
+                    <tr class="${rowClass} ${signalClass} hover:bg-gray-50 transition-colors">
+                        <td class="py-3 px-4 text-sm">${formatTimestamp(timestamp)}</td>
+                        <td class="py-3 px-4 text-sm font-medium">${token}</td>
+                        <td class="py-3 px-4">
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${signal === 'BUY' ? 'bg-green-100 text-green-800' :
+                        signal === 'SELL' ? 'bg-red-100 text-red-800' :
+                            'bg-gray-100 text-gray-800'
+                    }">
+                                ${signal}
+                            </span>
+                        </td>
+                        <td class="py-3 px-4 text-sm font-mono">$${parseFloat(openPrice).toFixed(2)}</td>
+                        <td class="py-3 px-4 text-sm font-mono">${rangeVal}</td>
+                        <td class="py-3 px-4 text-sm font-mono">$${parseFloat(stopLoss).toFixed(2)}</td>
+                        <td class="py-3 px-4 text-sm font-mono">$${parseFloat(takeProfit).toFixed(2)}</td>
+                        <td class="py-3 px-4 text-sm text-center">${leverage}x</td>
+                        <td class="py-3 px-4">
+                            <div class="flex items-center">
+                                <div class="w-16 bg-gray-200 rounded-full h-2 mr-2">
+                                    <div class="bg-blue-600 h-2 rounded-full" style="width: ${confidence}%"></div>
+                                </div>
+                                <span class="text-sm">${confidence}%</span>
+                            </div>
+                        </td>
+                        <td class="py-3 px-4 text-sm font-mono">$${parseFloat(marketSizeVal).toFixed(2)}</td>
+                        <td class="py-3 px-4 text-sm ${movingInfo.includes('-') ? 'text-red-600' : 'text-green-600'
+                    }">${movingInfo}</td>
+                        <td class="py-3 px-4 text-sm text-gray-600">${reasons}</td>
+                    </tr>
+                `;
+                tbody.innerHTML += row;
+            });
+
+            previousSignals = currentSignals;
+        }
+
+        function updateStats(lines) {
+            const buySignals = lines.filter(line => line.includes('|BUY|')).length;
+            const sellSignals = lines.filter(line => line.includes('|SELL|')).length;
+            const activeSignals = buySignals + sellSignals;
+
+            document.getElementById('activeSignals').textContent = activeSignals;
+            document.getElementById('cacheEntries').textContent = lines.length;
+            document.getElementById('lastAnalysis').textContent = new Date().toLocaleTimeString();
+
+            // Update configuration display
+            document.getElementById('configMode').textContent = CONFIG.leverage + 'x Leverage';
+            document.getElementById('configTimeframe').textContent = CONFIG.timeframe;
+            document.getElementById('configLeverage').textContent = CONFIG.leverage + 'x';
+            document.getElementById('configMaxPositions').textContent = CONFIG.maxPositions;
+
+            // Check if bot is actively writing to cache
+            if (lines.length > lastCacheCount) {
+                document.getElementById('systemStatus').textContent = 'Running';
+                document.getElementById('systemStatus').className = 'font-medium text-green-600';
+            } else {
+                document.getElementById('systemStatus').textContent = 'No New Data';
+                document.getElementById('systemStatus').className = 'font-medium text-yellow-600';
+            }
+            lastCacheCount = lines.length;
+        }
+
+        function updateProfitFromLog() {
             fetch('logs/market_analysis.log')
-                .then(res => {
-                    if (!res.ok) throw new Error('Log file not found');
-                    return res.text();
+                .then(response => {
+                    if (!response.ok) throw new Error('Log file not found');
+                    return response.text();
                 })
                 .then(log => {
-                    const profitLine = log.split('\n').reverse().find(line => line.includes('Total Profit'));
-                    const profit = profitLine ? profitLine.match(/Total Profit: \$([-0-9.]+)/)[1] : 'Unknown';
-                    document.querySelector('#totalProfit').textContent = `Total Profit: $${profit}`;
+                    const lines = log.split('\n').reverse();
+                    let profit = '0.00';
+                    let openPositions = '0';
+
+                    // Find profit and positions in recent log entries
+                    for (const line of lines) {
+                        if (line.includes('Total Profit: $') && profit === '0.00') {
+                            const match = line.match(/Total Profit: \$([-0-9.]+)/);
+                            if (match) profit = match[1];
+                        }
+                        if (line.includes('Positions:') && openPositions === '0') {
+                            const match = line.match(/Positions: (\d+)/);
+                            if (match) openPositions = match[1];
+                        }
+                        if (profit !== '0.00' && openPositions !== '0') break;
+                    }
+
+                    document.getElementById('totalProfit').textContent = `$${profit}`;
+                    document.getElementById('openPositions').textContent = openPositions;
                 })
                 .catch(error => {
                     console.error('Error loading log:', error);
-                    document.querySelector('#totalProfit').textContent = 'Total Profit: Error - Log file not found';
                 });
         }
 
-        updateTable();
-        setInterval(updateTable, 2000);
+        function updateLastUpdated() {
+            const now = new Date();
+            document.getElementById('updateTime').textContent = now.toLocaleString();
+        }
+
+        function formatTimestamp(timestamp) {
+            const date = new Date(timestamp);
+            return date.toLocaleTimeString();
+        }
+
+        // Initialize dashboard
+        document.addEventListener('DOMContentLoaded', function () {
+            updateDashboard();
+            setInterval(updateDashboard, 2000); // Update every 2 seconds
+
+            // Add some visual feedback
+            setInterval(() => {
+                const status = document.getElementById('status');
+                status.classList.toggle('bg-green-100');
+                status.classList.toggle('bg-green-200');
+            }, 1000);
+        });
     </script>
 </body>
+
 </html>

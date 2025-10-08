@@ -1,52 +1,28 @@
-from config.settings import *
-
 class RiskManager:
-    def __init__(self, capital):
-        self.capital = capital
-        self.max_risk_per_trade = MAX_POSITION_SIZE
-        self.stop_loss_percent = STOP_LOSS_PERCENT
-        self.take_profit_percent = TAKE_PROFIT_PERCENT
+    def __init__(self, initial_capital):
+        self.initial_capital = initial_capital
     
-    def calculate_position_size(self, entry_price, stop_loss_price):
-        risk_amount = self.capital * self.max_risk_per_trade
-        price_risk = abs(entry_price - stop_loss_price)
+    def calculate_position_size(self, entry_price, stop_loss, risk_percent=0.02):
+        """
+        Calculate position size based on risk management
         
-        if price_risk == 0:
+        Args:
+            entry_price: Entry price of the trade
+            stop_loss: Stop loss price
+            risk_percent: Risk percentage (default 2%)
+        
+        Returns:
+            Position size in units
+        """
+        try:
+            risk_amount = self.initial_capital * risk_percent
+            price_risk = abs(entry_price - stop_loss)
+            
+            if price_risk > 0:
+                position_size = risk_amount / price_risk
+                return position_size
+            else:
+                return 0
+        except Exception as e:
+            print(f"Error calculating position size: {e}")
             return 0
-        
-        position_size = risk_amount / price_risk
-        return position_size
-    
-    def calculate_stop_loss(self, entry_price, direction, atr=None):
-        if direction == 'long':
-            if atr:
-                return entry_price - (atr * 2)
-            return entry_price * (1 - self.stop_loss_percent)
-        else:  # short
-            if atr:
-                return entry_price + (atr * 2)
-            return entry_price * (1 + self.stop_loss_percent)
-    
-    def calculate_take_profit(self, entry_price, direction):
-        if direction == 'long':
-            return entry_price * (1 + self.take_profit_percent)
-        else:
-            return entry_price * (1 - self.take_profit_percent)
-    
-    def validate_trade(self, entry, stop_loss, take_profit, direction):
-        if direction == 'long':
-            risk = entry - stop_loss
-            reward = take_profit - entry
-        else:
-            risk = stop_loss - entry
-            reward = entry - take_profit
-        
-        if risk <= 0:
-            return False, "Invalid stop loss"
-        
-        risk_reward = reward / risk
-        
-        if risk_reward < MIN_RISK_REWARD_RATIO:
-            return False, f"Risk/Reward ratio too low: {risk_reward:.2f}"
-        
-        return True, f"Risk/Reward: {risk_reward:.2f}"

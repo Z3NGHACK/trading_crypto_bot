@@ -115,6 +115,23 @@ python main.py
 python -m http.server 8000
 ```
 
+```
+# Deactivate current environment
+deactivate
+
+# Delete the problematic environment
+rm -rf trading_bot_env
+
+# Create fresh environment
+python -m venv trading_bot_env
+
+# Activate (PowerShell)
+.\trading_bot_env\Scripts\Activate.ps1
+
+# Install only essential packages
+pip install pandas ccxt python-dotenv
+```
+
 ### Monitoring & Analytics
 
 Access the real-time dashboard at `http://localhost:8000/monitor.html`
