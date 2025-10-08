@@ -1,112 +1,79 @@
-from .base import BaseStrategy
+import pandas as pd
+import logging
 from config.settings import RSI_OVERSOLD, RSI_OVERBOUGHT
 
-class SignalGenerator(BaseStrategy):
+class SignalGenerator:
     def __init__(self):
-        super().__init__("Multi-Factor Strategy")
-    
-    def generate_signal(self, df, analysis, tech):
-        trend = analysis.get('trend', 'ranging')
-        rsi = df['rsi'].iloc[-1] if 'rsi' in df else 50
-        bullish_obs = analysis.get('bullish_order_blocks', [])
-        bearish_obs = analysis.get('bearish_order_blocks', [])
-        volume_spike = analysis.get('volume_spike', False)
-        breakout = analysis.get('breakout', None)
-        highs = analysis.get('highs', [])
-        lows = analysis.get('lows', [])
-        
-        current_price = df['close'].iloc[-1]
-        ema_20 = df['ema_20'].iloc[-1] if 'ema_20' in df else current_price
-        ema_50 = df['ema_50'].iloc[-1] if 'ema_50' in df else current_price
-        
-        score = 0
-        reasons = []
-        
-        # BULLISH SIGNALS
-        if trend == 'bullish':
-            score += 2
-            reasons.append("Bullish trend")
-        
-        if rsi < RSI_OVERSOLD:
-            score += 2
-            reasons.append(f"RSI oversold ({rsi:.1f})")
-        
-        if ema_20 > ema_50:
-            score += 1
-            reasons.append("EMA 20 > EMA 50")
-        
-        if breakout == 'bullish_breakout':
-            score += 3
-            reasons.append("Bullish breakout detected")
-        
-        if volume_spike:
-            score += 1
-            reasons.append("Volume spike")
-        
-        # Check if near bullish order block
-        for ob in bullish_obs[-3:]:
-            if abs(current_price - ob['top']) / current_price < 0.01:
-                score += 2
-                reasons.append("Near bullish order block")
-                break
-        
-        # BEARISH SIGNALS
-        bearish_score = 0
-        bearish_reasons = []
-        
-        if trend == 'bearish':
-            bearish_score += 2
-            bearish_reasons.append("Bearish trend")
-        
-        if rsi > RSI_OVERBOUGHT:
-            bearish_score += 2
-            bearish_reasons.append(f"RSI overbought ({rsi:.1f})")
-        
-        if ema_20 < ema_50:
-            bearish_score += 1
-            bearish_reasons.append("EMA 20 < EMA 50")
-        
-        if breakout == 'bearish_breakout':
-            bearish_score += 3
-            bearish_reasons.append("Bearish breakout detected")
-        
-        for ob in bearish_obs[-3:]:
-            if abs(current_price - ob['bottom']) / current_price < 0.01:
-                bearish_score += 2
-                bearish_reasons.append("Near bearish order block")
-                break
-        
-        # MACD for additional confidence
-        macd, signal_line = tech.calculate_macd()
-        if macd.iloc[-1] > signal_line.iloc[-1]:
-            score += 2
-            reasons.append("MACD bullish")
-        else:
-            bearish_score += 2
-            bearish_reasons.append("MACD bearish")
-        
-        # Generate final signal
-        if score >= 5 and score > bearish_score:
-            return {
-                'signal': 'BUY',
-                'score': score,
-                'confidence': min(score / 10, 1.0),
-                'reasons': reasons
+        self.logger = logging.getLogger(__name__)
+
+    def generate_signal(self, df):
+        try:
+            symbol = df['symbol'].iloc[0] if 'symbol' in df.columns else 'unknown'
+            self.logger.debug(f"Generating signal for {symbol} with {len(df)} candles")
+            self.logger.debug(f"DataFrame columns: {list(df.columns)}")
+            self.logger.debug(f"Last row: {df.tail(1).to_dict()}")
+            if df.empty or len(df) < 14:
+                self.logger.warning(f"Insufficient data for {symbol}: {len(df)} candles")
+                return {'symbol': symbol, 'direction': 'HOLD', 'confidence': 0.0}
+
+            # Simple RSI-based strategy
+            df['rsi'] = self.calculate_rsi(df['close'], 14)
+            latest = df.iloc[-1]
+            prev = df.iloc[-2]
+
+            signal = 'HOLD'
+            confidence = 0.5
+            entry_price = latest['close']
+            stop_loss = entry_price * (1 - 0.02)  # 2% stop loss
+            take_profit = entry_price * (1 + 0.04)  # 4% take profit
+            market_size = entry_price * 100  # Example position size
+            moving = '0.00%'
+            reasons = []
+            range_val = f"{latest['low']:.2f}-{latest['high']:.2f}"
+            timestamp = int(latest['timestamp'].timestamp() * 1000) if 'timestamp' in df.columns and pd.notnull(latest['timestamp']) else int(pd.Timestamp.now().timestamp() * 1000)
+
+            if latest['rsi'] < RSI_OVERSOLD and prev['rsi'] >= RSI_OVERSOLD:
+                signal = 'BUY'
+                confidence = 0.85
+                reasons.append('RSI Oversold Crossover')
+            elif latest['rsi'] > RSI_OVERBOUGHT and prev['rsi'] <= RSI_OVERBOUGHT:
+                signal = 'SELL'
+                confidence = 0.85
+                reasons.append('RSI Overbought Crossover')
+
+            price_change = ((latest['close'] - prev['close']) / prev['close'] * 100)
+            moving = f"{price_change:+.2f}%"
+            accuracy = confidence * 100  # Simplified for display
+
+            signal_data = {
+                'symbol': symbol,
+                'direction': signal,
+                'entry_price': entry_price,
+                'stop_loss': stop_loss,
+                'take_profit': take_profit,
+                'confidence': confidence,
+                'range': range_val,
+                'leverage': 1,
+                'market_size': market_size,
+                'moving': moving,
+                'reasons': ', '.join(reasons) if reasons else 'No clear signal',
+                'accuracy': accuracy,
+                'timestamp': timestamp
             }
-        elif bearish_score >= 5 and bearish_score > score:
-            return {
-                'signal': 'SELL',
-                'score': bearish_score,
-                'confidence': min(bearish_score / 10, 1.0),
-                'reasons': bearish_reasons
-            }
-        else:
-            return {
-                'signal': 'HOLD',
-                'score': max(score, bearish_score),
-                'confidence': 0,
-                'reasons': ['Not enough confluence']
-            }
-    
-    def calculate_position_size(self, capital, risk_percent):
-        return capital * risk_percent
+            self.logger.info(f"Generated signal for {symbol}: {signal_data['direction']} (Confidence: {confidence})")
+            return signal_data
+        except Exception as e:
+            self.logger.error(f"Error generating signal for {symbol}: {e}")
+            return {'symbol': symbol, 'direction': 'HOLD', 'confidence': 0.0}
+
+    def calculate_rsi(self, prices, period=14):
+        try:
+            delta = prices.diff()
+            gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
+            loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
+            rs = gain / loss
+            rsi = 100 - (100 / (1 + rs))
+            return rsi
+        except Exception as e:
+            self.logger.error(f"Error calculating RSI: {e}")
+            return pd.Series([0] * len(prices))

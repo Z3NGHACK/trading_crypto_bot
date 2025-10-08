@@ -98,7 +98,7 @@ MAX_OPEN_TRADES = 3
 LEVERAGE = 10
 
 # Strategy Parameters
-SIGNAL_CONFIDENCE_THRESHOLD = 0.5
+SIGNAL_CONFIDENCE_THRESHOLD = 0.8
 TIMEFRAME = '15m'
 ANALYSIS_INTERVAL = 60  # seconds
 ```
@@ -201,7 +201,7 @@ python monitoring/dashboard.py --performance-report
 MAX_OPEN_TRADES = 5  # Increase if needed
 
 # Verify signal confidence threshold
-SIGNAL_CONFIDENCE_THRESHOLD = 0.4  # Lower for more signals
+SIGNAL_CONFIDENCE_THRESHOLD = 0.8  # Lower for more signals
 ```
 
 **Data Quality Issues**
