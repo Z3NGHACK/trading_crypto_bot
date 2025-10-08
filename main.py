@@ -29,14 +29,14 @@ LEVERAGE = get_leverage()
 STOP_LOSS_PERCENT = STOP_LOSS_ATR_MULTIPLIER * 0.01
 TAKE_PROFIT_PERCENT = TAKE_PROFIT_RATIO * STOP_LOSS_PERCENT
 
-# Setup logging
+# Setup logging - FIXED: No emojis, proper encoding
 os.makedirs("logs", exist_ok=True)
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s",
     handlers=[
-        logging.FileHandler("logs/market_analysis.log", mode="a"),
-        logging.StreamHandler(),
+        logging.FileHandler("logs/market_analysis.log", mode="a", encoding='utf-8'),
+        logging.StreamHandler(),  # This will use system encoding
     ],
 )
 
@@ -62,7 +62,7 @@ class TradingBot:
         self.running = False
         self.initial_capital = initial_capital
 
-        # Log configuration
+        # Log configuration - FIXED: No emojis
         logging.info("=== Trading Bot Configuration ===")
         logging.info(f"Trading Pairs: {TRADING_PAIRS}")
         logging.info(f"Primary Timeframe: {PRIMARY_TIMEFRAME}")
@@ -122,11 +122,7 @@ class TradingBot:
             # Calculate price change for moving info
             price_change = 0
             if len(df) > 1:
-                price_change = (
-                    (df["close"].iloc[-1] - df["close"].iloc[-2])
-                    / df["close"].iloc[-2]
-                    * 100
-                )
+                price_change = (df['close'].iloc[-1] - df['close'].iloc[-2]) / df['close'].iloc[-2] * 100
 
             # Prepare moving info
             moving_info = f"Change%={price_change:.2f}%"
@@ -142,7 +138,7 @@ class TradingBot:
             )
 
             try:
-                with open(CACHE_FILE, "a") as f:
+                with open(CACHE_FILE, "a", encoding='utf-8') as f:
                     f.write(cache_entry)
                 logging.debug(f"Cached: {symbol} - {signal['signal']}")
             except Exception as e:
@@ -160,13 +156,12 @@ class TradingBot:
                 "take_profit": tp,
                 "position_size": position_size,
                 "market_size": market_size,
-                "df": df,
+                "df": df
             }
 
         except Exception as e:
             logging.error(f"Error analyzing {symbol}: {e}")
             import traceback
-
             logging.error(traceback.format_exc())
             return None
 
@@ -184,9 +179,9 @@ class TradingBot:
         elif price_change < -0.005:  # 0.5% decrease
             return {"signal": "SELL", "confidence": 0.75, "reason": "Bearish momentum"}
         elif price_change > 0.002:  # 0.2% increase
-            return {"signal": "BUY", "confidence": 0.6, "reason": "Slight bullish"}
+            return {"signal": "BUY", "confidence": 0.65, "reason": "Slight bullish"}  # Increased to 0.65
         elif price_change < -0.002:  # 0.2% decrease
-            return {"signal": "SELL", "confidence": 0.6, "reason": "Slight bearish"}
+            return {"signal": "SELL", "confidence": 0.65, "reason": "Slight bearish"}  # Increased to 0.65
         else:
             return {
                 "signal": "HOLD",
@@ -210,14 +205,13 @@ class TradingBot:
         ):
 
             # Execute trade through trader
-            trade = self.trader.execute_trade(
-                signal, symbol, analysis_result["df"], analysis_result
-            )
-
+            trade = self.trader.execute_trade(signal, symbol, analysis_result["df"], analysis_result)
+            
             if trade:
                 self.portfolio.add_position(trade)
+                # FIXED: No emojis in logging
                 logging.info(
-                    f"📈 TRADE EXECUTED: {symbol} {signal['signal']} @ ${analysis_result['entry_price']:.2f}"
+                    f"TRADE EXECUTED: {symbol} {signal['signal']} @ ${analysis_result['entry_price']:.2f}"
                 )
                 logging.info(f"Position Size: {analysis_result['position_size']:.6f}")
                 logging.info(f"Market Size: ${analysis_result['market_size']:.2f}")
@@ -227,9 +221,8 @@ class TradingBot:
                 return trade
         else:
             if signal["signal"] in ["BUY", "SELL"]:
-                logging.info(
-                    f"⏸️  SKIP TRADE: {symbol} - Confidence: {signal['confidence']:.2f} < {CONFIDENCE_THRESHOLD} or max trades reached"
-                )
+                # FIXED: No emojis in logging
+                logging.info(f"SKIP TRADE: {symbol} - Confidence: {signal['confidence']:.2f} < {CONFIDENCE_THRESHOLD} or max trades reached")
             return None
 
     def update_portfolio_values(self):
@@ -240,9 +233,7 @@ class TradingBot:
                 ohlcv = self.exchange.fetch_ohlcv(symbol, "1m", limit=1)
                 if ohlcv and len(ohlcv) > 0:
                     current_prices[symbol] = ohlcv[0][4]
-                    logging.debug(
-                        f"Current price for {symbol}: ${current_prices[symbol]:.2f}"
-                    )
+                    logging.debug(f"Current price for {symbol}: ${current_prices[symbol]:.2f}")
             except Exception as e:
                 logging.error(f"Error fetching price for {symbol}: {e}")
 
@@ -252,19 +243,20 @@ class TradingBot:
             open_positions = self.portfolio.get_open_positions_count()
 
             logging.info(
-                f"💰 PORTFOLIO UPDATE: ${portfolio_value:.2f} | Profit: ${total_profit:.2f} | Positions: {open_positions}/{MAX_OPEN_TRADES}"
+                f"PORTFOLIO UPDATE: ${portfolio_value:.2f} | Profit: ${total_profit:.2f} | Positions: {open_positions}/{MAX_OPEN_TRADES}"
             )
-
+            
             # Log profit for monitor.html to read
             logging.info(f"Total Profit: ${total_profit:.2f}")
-
+            
             return portfolio_value
         return None
 
     def run(self):
         """Main trading loop"""
         self.running = True
-        logging.info("🚀 Trading Bot Started!")
+        # FIXED: No emojis in logging
+        logging.info("Trading Bot Started!")
         logging.info(f"Monitoring {len(TRADING_PAIRS)} trading pairs")
         logging.info(f"Analysis interval: {ANALYSIS_INTERVAL} seconds")
 
@@ -274,7 +266,7 @@ class TradingBot:
         try:
             while self.running:
                 analysis_count += 1
-                logging.info(f"\n--- Analysis Cycle #{analysis_count} ---")
+                logging.info(f"--- Analysis Cycle #{analysis_count} ---")
 
                 # Analyze all trading pairs
                 for symbol in TRADING_PAIRS:
@@ -287,18 +279,13 @@ class TradingBot:
                         continue
 
                 # Update portfolio values every 3 cycles or every 3 minutes
-                if (
-                    analysis_count % 3 == 0
-                    or (time.time() - last_portfolio_update) > 180
-                ):
+                if analysis_count % 3 == 0 or (time.time() - last_portfolio_update) > 180:
                     self.update_portfolio_values()
                     last_portfolio_update = time.time()
 
                 # Wait for next analysis cycle
-                logging.info(
-                    f"Waiting {ANALYSIS_INTERVAL} seconds for next analysis..."
-                )
-
+                logging.info(f"Waiting {ANALYSIS_INTERVAL} seconds for next analysis...")
+                
                 # Break the sleep into smaller chunks to allow for KeyboardInterrupt
                 for i in range(ANALYSIS_INTERVAL):
                     if not self.running:
@@ -306,18 +293,19 @@ class TradingBot:
                     time.sleep(1)
 
         except KeyboardInterrupt:
-            logging.info("🛑 Bot stopped by user")
+            # FIXED: No emojis in logging
+            logging.info("Bot stopped by user")
             self.running = False
         except Exception as e:
-            logging.error(f"❌ Error in main loop: {e}")
+            # FIXED: No emojis in logging
+            logging.error(f"Error in main loop: {e}")
             import traceback
-
             logging.error(traceback.format_exc())
             self.running = False
         finally:
-            logging.info("📊 Final Portfolio Summary:")
+            logging.info("Final Portfolio Summary:")
             self.update_portfolio_values()
-            logging.info("👋 Trading Bot Shutdown Complete")
+            logging.info("Trading Bot Shutdown Complete")
 
 
 if __name__ == "__main__":
@@ -326,18 +314,17 @@ if __name__ == "__main__":
         import pandas as pd
         import ccxt
         from dotenv import load_dotenv
-
-        logging.info("✓ All imports successful")
-
+        
+        logging.info("All imports successful")
+        
         # Create bot and run
         bot = TradingBot(initial_capital=10000)
         bot.run()
-
+        
     except ImportError as e:
-        logging.error(f"❌ Import error: {e}")
+        logging.error(f"Import error: {e}")
         print(f"Please install missing dependencies: {e}")
     except Exception as e:
-        logging.error(f"❌ Failed to start bot: {e}")
+        logging.error(f"Failed to start bot: {e}")
         import traceback
-
         logging.error(traceback.format_exc())
