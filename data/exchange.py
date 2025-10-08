@@ -1,5 +1,5 @@
 import ccxt
-from config.settings import *
+from config import EXCHANGE_ID, API_KEY, API_SECRET, SANDBOX_MODE
 
 class ExchangeConnector:
     def __init__(self):
@@ -8,7 +8,7 @@ class ExchangeConnector:
             'apiKey': API_KEY,
             'secret': API_SECRET,
             'enableRateLimit': True,
-            'options': {'defaultType': 'spot'}  # Changed to spot trading
+            'options': {'defaultType': 'future'}
         })
         
         if SANDBOX_MODE:
@@ -20,7 +20,7 @@ class ExchangeConnector:
             ohlcv = self.exchange.fetch_ohlcv(symbol, timeframe, limit=limit)
             return ohlcv
         except Exception as e:
-            print(f"Error fetching data: {e}")
+            print(f"Error fetching data for {symbol}: {e}")
             return None
     
     def get_balance(self):
@@ -29,16 +29,4 @@ class ExchangeConnector:
             return self.exchange.fetch_balance()
         except Exception as e:
             print(f"Error fetching balance: {e}")
-            return None
-    
-    def place_order(self, symbol, order_type, side, amount, price=None):
-        '''Place an order'''
-        try:
-            if order_type == 'market':
-                order = self.exchange.create_market_order(symbol, side, amount)
-            else:
-                order = self.exchange.create_limit_order(symbol, side, amount, price)
-            return order
-        except Exception as e:
-            print(f"Error placing order: {e}")
             return None
