@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Trading Bot Monitor</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         .blink-new {
             animation: blink 2s ease-in-out 3;
@@ -37,160 +38,275 @@
             background-color: #f3f4f6;
             color: #6b7280;
         }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            height: 200px;
+            min-height: 150px;
+            max-height: 200px;
+            overflow: hidden;
+        }
+
+        /* Improved tab styles */
+        .tab-button {
+            padding: 1rem 2rem;
+            font-weight: 600;
+            color: #4b5563;
+            background-color: #f9fafb;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s ease;
+        }
+
+        .tab-button:hover {
+            color: #2563eb;
+        }
+
+        .tab-button.active {
+            color: #2563eb;
+            border-bottom-color: #2563eb;
+        }
+
+        /* Card hover effects */
+        .stats-card {
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .stats-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        }
     </style>
 </head>
 
-<body class="bg-gray-50 font-sans p-4">
-    <div class="max-w-7xl mx-auto">
+<body class="bg-gray-100 font-sans antialiased">
+    <div class="max-w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <!-- Header -->
-        <div class="bg-white rounded-lg shadow-sm p-6 mb-6">
-            <div class="flex justify-between items-center">
+        <div class="bg-white rounded-2xl shadow-md p-6 mb-6">
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center space-y-4 md:space-y-0">
                 <div>
-                    <h1 class="text-3xl font-bold text-gray-800">Trading Bot Monitor</h1>
-                    <p class="text-gray-600 mt-2">Real-time trading signals and portfolio performance</p>
+                    <h1 class="text-3xl font-bold text-gray-900">Trading Bot Monitor</h1>
+                    <p class="text-gray-500 mt-1">Real-time insights into trading signals and performance</p>
                 </div>
-                <div class="text-right">
+                <div class="text-right w-full md:w-auto">
                     <div id="status"
-                        class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
-                        <span class="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
+                        class="inline-flex items-center px-4 py-2 rounded-full text-sm font-medium bg-green-50 text-green-700 ring-1 ring-inset ring-green-600/20">
+                        <span class="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></span>
                         LIVE
                     </div>
-                    <p id="lastUpdated" class="text-sm text-gray-500 mt-1">Last Updated: <span
+                    <p id="lastUpdated" class="text-sm text-gray-500 mt-2">Last Updated: <span
                             id="updateTime">Waiting...</span></p>
                 </div>
             </div>
 
             <!-- Stats Cards -->
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mt-6">
-                <div class="bg-blue-50 rounded-lg p-4">
-                    <div class="text-blue-600 text-sm font-medium">Total Pairs</div>
-                    <div class="text-2xl font-bold text-blue-800" id="totalPairs">10</div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
+                <div class="stats-card bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-5 hover:shadow-xl">
+                    <div class="text-blue-700 text-sm font-medium">Total Pairs</div>
+                    <div class="text-2xl font-bold text-blue-900" id="totalPairs">10</div>
                 </div>
-                <div class="bg-green-50 rounded-lg p-4">
-                    <div class="text-green-600 text-sm font-medium">Active Signals</div>
-                    <div class="text-2xl font-bold text-green-800" id="activeSignals">0</div>
+                <div class="stats-card bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-5 hover:shadow-xl">
+                    <div class="text-green-700 text-sm font-medium">Active Signals</div>
+                    <div class="text-2xl font-bold text-green-900" id="activeSignals">0</div>
                 </div>
-                <div class="bg-purple-50 rounded-lg p-4">
-                    <div class="text-purple-600 text-sm font-medium">Open Positions</div>
-                    <div class="text-2xl font-bold text-purple-800" id="openPositions">0</div>
+                <div class="stats-card bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-5 hover:shadow-xl">
+                    <div class="text-purple-700 text-sm font-medium">Open Positions</div>
+                    <div class="text-2xl font-bold text-purple-900" id="openPositions">0</div>
                 </div>
-                <div class="bg-orange-50 rounded-lg p-4">
-                    <div class="text-orange-600 text-sm font-medium">Total Profit</div>
-                    <div class="text-2xl font-bold text-orange-800" id="totalProfit">$0.00</div>
+                <div class="stats-card bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl p-5 hover:shadow-xl">
+                    <div class="text-orange-700 text-sm font-medium">Total Profit</div>
+                    <div class="text-2xl font-bold text-orange-900" id="totalProfit">$0.00</div>
                 </div>
             </div>
         </div>
 
-        <!-- Trading Signals Table -->
-        <div class="bg-white rounded-lg shadow-sm overflow-hidden">
-            <div class="px-6 py-4 border-b border-gray-200">
-                <h2 class="text-xl font-semibold text-gray-800">Latest Trading Signals</h2>
-                <p class="text-gray-600 text-sm mt-1">Showing latest signal for each trading pair (updates every 2
+        <!-- Tabs Navigation -->
+        <div class="bg-white rounded-t-2xl shadow-md overflow-hidden">
+            <nav class="flex border-b border-gray-200">
+                <button class="tab-button active" onclick="showTab('signals')">Latest Signals</button>
+                <button class="tab-button" onclick="showTab('history')">Trade History</button>
+            </nav>
+        </div>
+
+        <!-- Tabs Content -->
+        <div class="bg-white rounded-b-2xl shadow-md overflow-hidden mb-6">
+            <!-- Signals Tab -->
+            <div id="signalsTab" class="p-6">
+                <h2 class="text-xl font-semibold text-gray-900 mb-2">Latest Trading Signals</h2>
+                <p class="text-gray-500 text-sm mb-4">Showing latest signal for each trading pair (updates every 2
                     seconds)</p>
+                <div class="overflow-x-auto border border-gray-200 rounded-lg">
+                    <table class="w-full min-w-max">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Timestamp</th>
+                                <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Token</th>
+                                <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Signal</th>
+                                <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Price</th>
+                                <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Range</th>
+                                <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Stop Loss</th>
+                                <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Take Profit</th>
+                                <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Leverage</th>
+                                <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Confidence</th>
+                                <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Market Size</th>
+                                <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Price Change</th>
+                                <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Reasons</th>
+                            </tr>
+                        </thead>
+                        <tbody id="signalsTable" class="bg-white divide-y divide-gray-200">
+                            <!-- Data will be populated by JavaScript -->
+                            <tr>
+                                <td colspan="12" class="py-8 text-center text-gray-500">
+                                    <div class="flex justify-center items-center">
+                                        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                                        <span class="ml-2">Loading trading data...</span>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
 
-            <div class="overflow-x-auto">
-                <table class="w-full">
-                    <thead class="bg-gray-50">
-                        <tr>
-                            <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Timestamp</th>
-                            <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Token</th>
-                            <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Signal</th>
-                            <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Price</th>
-                            <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Range</th>
-                            <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Stop Loss</th>
-                            <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Take Profit</th>
-                            <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Leverage</th>
-                            <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Confidence</th>
-                            <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Market Size</th>
-                            <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Price Change</th>
-                            <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Reasons</th>
-                        </tr>
-                    </thead>
-                    <tbody id="signalsTable" class="bg-white divide-y divide-gray-200">
-                        <!-- Data will be populated by JavaScript -->
-                        <tr>
-                            <td colspan="12" class="py-8 text-center text-gray-500">
-                                <div class="flex justify-center items-center">
-                                    <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                                    <span class="ml-2">Loading trading data...</span>
-                                </div>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
+            <!-- History Tab (hidden by default) -->
+            <div id="historyTab" class="p-6 hidden">
+                <h2 class="text-xl font-semibold text-gray-900 mb-2">Trade History & Performance</h2>
+                <p class="text-gray-500 text-sm mb-4">Historical trades, accuracy metrics, and portfolio performance</p>
+                
+                <!-- History Stats -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                    <div class="stats-card bg-gradient-to-br from-indigo-50 to-indigo-100 rounded-xl p-5 hover:shadow-xl">
+                        <div class="text-indigo-700 text-sm font-medium">Total Trades</div>
+                        <div class="text-2xl font-bold text-indigo-900" id="totalTrades">0</div>
+                    </div>
+                    <div class="stats-card bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-5 hover:shadow-xl">
+                        <div class="text-green-700 text-sm font-medium">Win Rate</div>
+                        <div class="text-2xl font-bold text-green-900" id="winRate">0%</div>
+                    </div>
+                    <div class="stats-card bg-gradient-to-br from-red-50 to-red-100 rounded-xl p-5 hover:shadow-xl">
+                        <div class="text-red-700 text-sm font-medium">Max Drawdown</div>
+                        <div class="text-2xl font-bold text-red-900" id="maxDrawdown">0%</div>
+                    </div>
+                    <div class="stats-card bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-xl p-5 hover:shadow-xl">
+                        <div class="text-yellow-700 text-sm font-medium">Avg Trade Duration</div>
+                        <div class="text-2xl font-bold text-yellow-900" id="avgDuration">-</div>
+                    </div>
+                </div>
+
+                <!-- Portfolio Value Chart -->
+                <div class="bg-white rounded-xl p-5 mb-6 border border-gray-200">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">Portfolio Value Over Time</h3>
+                    <div class="chart-container" style="position: relative; height: 200px; min-height: 150px; max-height: 200px;">
+                        <canvas id="portfolioChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- History Table -->
+                <div class="overflow-x-auto border border-gray-200 rounded-lg">
+                    <table class="w-full min-w-max">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Timestamp</th>
+                                <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Token</th>
+                                <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Action</th>
+                                <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Entry Price</th>
+                                <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Exit Price</th>
+                                <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Profit/Loss</th>
+                                <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Reasons</th>
+                            </tr>
+                        </thead>
+                        <tbody id="historyTable" class="bg-white divide-y divide-gray-200">
+                            <!-- Data will be populated by JavaScript -->
+                            <tr>
+                                <td colspan="7" class="py-8 text-center text-gray-500">
+                                    <div class="flex justify-center items-center">
+                                        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                                        <span class="ml-2">Loading history data...</span>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
 
         <!-- Bot Information -->
-        <div class="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div class="bg-white rounded-lg shadow-sm p-6">
-                <h3 class="text-lg font-semibold text-gray-800 mb-4">Bot Configuration</h3>
-                <div class="space-y-3">
-                    <div class="flex justify-between">
-                        <span class="text-gray-600">Trading Mode:</span>
-                        <span class="font-medium" id="configMode">Sandbox (Testnet)</span>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="bg-white rounded-2xl shadow-md p-6">
+                <h3 class="text-lg font-semibold text-gray-900 mb-4">Bot Configuration</h3>
+                <dl class="space-y-3">
+                    <div class="flex justify-between text-sm">
+                        <dt class="text-gray-600">Trading Mode:</dt>
+                        <dd class="font-medium" id="configMode">Sandbox (Testnet)</dd>
                     </div>
-                    <div class="flex justify-between">
-                        <span class="text-gray-600">Timeframe:</span>
-                        <span class="font-medium" id="configTimeframe">15m</span>
+                    <div class="flex justify-between text-sm">
+                        <dt class="text-gray-600">Timeframe:</dt>
+                        <dd class="font-medium" id="configTimeframe">15m</dd>
                     </div>
-                    <div class="flex justify-between">
-                        <span class="text-gray-600">Leverage:</span>
-                        <span class="font-medium" id="configLeverage">5x</span>
+                    <div class="flex justify-between text-sm">
+                        <dt class="text-gray-600">Leverage:</dt>
+                        <dd class="font-medium" id="configLeverage">5x</dd>
                     </div>
-                    <div class="flex justify-between">
-                        <span class="text-gray-600">Max Positions:</span>
-                        <span class="font-medium" id="configMaxPositions">3</span>
+                    <div class="flex justify-between text-sm">
+                        <dt class="text-gray-600">Max Positions:</dt>
+                        <dd class="font-medium" id="configMaxPositions">3</dd>
                     </div>
-                </div>
+                </dl>
             </div>
 
-            <div class="bg-white rounded-lg shadow-sm p-6">
-                <h3 class="text-lg font-semibold text-gray-800 mb-4">System Status</h3>
-                <div class="space-y-3">
-                    <div class="flex justify-between">
-                        <span class="text-gray-600">Bot Status:</span>
-                        <span class="font-medium text-green-600" id="systemStatus">Running</span>
+            <div class="bg-white rounded-2xl shadow-md p-6">
+                <h3 class="text-lg font-semibold text-gray-900 mb-4">System Status</h3>
+                <dl class="space-y-3">
+                    <div class="flex justify-between text-sm">
+                        <dt class="text-gray-600">Bot Status:</dt>
+                        <dd class="font-medium text-green-600" id="systemStatus">Running</dd>
                     </div>
-                    <div class="flex justify-between">
-                        <span class="text-gray-600">Last Analysis:</span>
-                        <span class="font-medium" id="lastAnalysis">-</span>
+                    <div class="flex justify-between text-sm">
+                        <dt class="text-gray-600">Last Analysis:</dt>
+                        <dd class="font-medium" id="lastAnalysis">-</dd>
                     </div>
-                    <div class="flex justify-between">
-                        <span class="text-gray-600">Cache Entries:</span>
-                        <span class="font-medium" id="cacheEntries">0</span>
+                    <div class="flex justify-between text-sm">
+                        <dt class="text-gray-600">Cache Entries:</dt>
+                        <dd class="font-medium" id="cacheEntries">0</dd>
                     </div>
-                    <div class="flex justify-between">
-                        <span class="text-gray-600">Update Frequency:</span>
-                        <span class="font-medium">Every 2 seconds</span>
+                    <div class="flex justify-between text-sm">
+                        <dt class="text-gray-600">Update Frequency:</dt>
+                        <dd class="font-medium">Every 2 seconds</dd>
                     </div>
-                </div>
+                </dl>
             </div>
         </div>
 
         <!-- Footer -->
-        <div class="mt-6 text-center text-gray-500 text-sm">
+        <footer class="mt-6 text-center text-gray-500 text-sm">
             <p>Trading Bot Monitor • Data from Binance Testnet • Updates every 2 seconds</p>
             <p class="mt-1">Accuracy ~60% (backtests) • Market Size shows position value with leverage</p>
-        </div>
+        </footer>
     </div>
 
     <script>
         let previousSignals = new Set();
         let lastCacheCount = 0;
+        let portfolioChart = null;
 
         // Configuration (should match your bot settings)
         const CONFIG = {
@@ -218,8 +334,9 @@
                     document.getElementById('updateTime').textContent = 'Error loading data';
                 });
 
-            // Update profit from log file
+            // Update profit and history from log file
             updateProfitFromLog();
+            updateHistoryFromLog();
         }
 
         function updateSignalsTable(lines) {
@@ -379,9 +496,184 @@
                 });
         }
 
-        function updateLastUpdated() {
-            const now = new Date();
-            document.getElementById('updateTime').textContent = now.toLocaleString();
+        function updateHistoryFromLog() {
+            fetch('logs/market_analysis.log')
+                .then(response => {
+                    if (!response.ok) throw new Error('Log file not found');
+                    return response.text();
+                })
+                .then(log => {
+                    const lines = log.split('\n');
+                    const trades = [];
+                    const portfolioHistory = [];
+                    let totalTrades = 0;
+                    let winTrades = 0;
+                    let maxDrawdown = 0;
+                    let initialPortfolio = 10000; // Assuming initial from config
+                    let peak = initialPortfolio;
+
+                    lines.forEach(line => {
+                        if (line.includes('TRADE EXECUTED')) {
+                            totalTrades++;
+                            // Parse trade details (simplified)
+                            const match = line.match(/TRADE EXECUTED: (\S+) (\S+) @ \$(\d+\.?\d*)/);
+                            if (match) {
+                                trades.push({
+                                    timestamp: line.split(' - ')[0],
+                                    token: match[1],
+                                    action: match[2],
+                                    entryPrice: parseFloat(match[3]),
+                                    // Add more parsing as needed
+                                    profitLoss: 0 // Placeholder; parse from close if available
+                                });
+                            }
+                        }
+                        if (line.includes('PORTFOLIO UPDATE')) {
+                            const profitMatch = line.match(/Profit: \$([-0-9.]+)/);
+                            if (profitMatch) {
+                                const profit = parseFloat(profitMatch[1]);
+                                const current = initialPortfolio + profit;
+                                portfolioHistory.push({
+                                    time: line.split(' - ')[0],
+                                    value: current
+                                });
+                                if (current > peak) peak = current;
+                                const dd = (peak - current) / peak * 100;
+                                if (dd > maxDrawdown) maxDrawdown = dd;
+                                if (profit > 0) winTrades++;
+                            }
+                        }
+                    });
+
+                    // Update history stats
+                    document.getElementById('totalTrades').textContent = totalTrades;
+                    document.getElementById('winRate').textContent = totalTrades > 0 ? ((winTrades / totalTrades) * 100).toFixed(2) + '%' : '0%';
+                    document.getElementById('maxDrawdown').textContent = maxDrawdown.toFixed(2) + '%';
+                    document.getElementById('avgDuration').textContent = 'N/A'; // Add logic if available
+
+                    // Update history table
+                    const tbody = document.getElementById('historyTable');
+                    tbody.innerHTML = '';
+                    if (trades.length === 0) {
+                        tbody.innerHTML = `<tr><td colspan="7" class="py-8 text-center text-gray-500">No trade history available yet.</td></tr>`;
+                    } else {
+                        trades.forEach(trade => {
+                            const row = `
+                                <tr class="hover:bg-gray-50 transition-colors">
+                                    <td class="py-3 px-4 text-sm">${trade.timestamp}</td>
+                                    <td class="py-3 px-4 text-sm font-medium">${trade.token}</td>
+                                    <td class="py-3 px-4 text-sm">${trade.action}</td>
+                                    <td class="py-3 px-4 text-sm font-mono">$${trade.entryPrice.toFixed(2)}</td>
+                                    <td class="py-3 px-4 text-sm font-mono">-</td> <!-- Exit Price -->
+                                    <td class="py-3 px-4 text-sm font-mono ${trade.profitLoss >= 0 ? 'text-green-600' : 'text-red-600'}">$${trade.profitLoss.toFixed(2)}</td>
+                                    <td class="py-3 px-4 text-sm text-gray-600">-</td> <!-- Reasons -->
+                                </tr>
+                            `;
+                            tbody.innerHTML += row;
+                        });
+                    }
+
+                    // Update portfolio chart
+                    updatePortfolioChart(portfolioHistory);
+                })
+                .catch(error => {
+                    console.error('Error loading log for history:', error);
+                    document.getElementById('historyTable').innerHTML = `<tr><td colspan="7" class="py-8 text-center text-gray-500">Error loading history data.</td></tr>`;
+                });
+        }
+
+        function updatePortfolioChart(history) {
+            const ctx = document.getElementById('portfolioChart').getContext('2d');
+            const labels = history.map(h => h.time);
+            const data = history.map(h => h.value);
+
+            // If chart exists, update data and labels
+            if (portfolioChart) {
+                portfolioChart.data.labels = labels;
+                portfolioChart.data.datasets[0].data = data;
+                portfolioChart.update(); // Update without recreating
+                return;
+            }
+
+            // Create new chart only if it doesn't exist
+            portfolioChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Portfolio Value',
+                        data: data,
+                        borderColor: '#3b82f6',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        tension: 0.1,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false, // Allow canvas to respect container height
+                    scales: {
+                        x: {
+                            display: true,
+                            title: {
+                                display: true,
+                                text: 'Time',
+                                color: '#4b5563',
+                                font: {
+                                    weight: '600'
+                                }
+                            },
+                            ticks: {
+                                maxTicksLimit: 10, // Limit number of x-axis labels for readability
+                                color: '#6b7280'
+                            }
+                        },
+                        y: {
+                            display: true,
+                            title: {
+                                display: true,
+                                text: 'Value ($)',
+                                color: '#4b5563',
+                                font: {
+                                    weight: '600'
+                                }
+                            },
+                            ticks: {
+                                color: '#6b7280',
+                                callback: function(value) {
+                                    return '$' + value.toFixed(2); // Format y-axis as currency
+                                }
+                            },
+                            suggestedMin: Math.min(...data, 9000) * 0.95, // Dynamic min with buffer
+                            suggestedMax: Math.max(...data, 11000) * 1.05 // Dynamic max with buffer
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            titleColor: '#ffffff',
+                            bodyColor: '#ffffff',
+                            callbacks: {
+                                label: function(context) {
+                                    return `$${context.parsed.y.toFixed(2)}`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function showTab(tabId) {
+            document.getElementById('signalsTab').classList.add('hidden');
+            document.getElementById('historyTab').classList.add('hidden');
+            document.getElementById(`${tabId}Tab`).classList.remove('hidden');
+
+            document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+            document.querySelector(`[onclick="showTab('${tabId}')"]`).classList.add('active');
         }
 
         function formatTimestamp(timestamp) {
@@ -394,11 +686,11 @@
             updateDashboard();
             setInterval(updateDashboard, 2000); // Update every 2 seconds
 
-            // Add some visual feedback
+            // Add visual feedback for status
             setInterval(() => {
                 const status = document.getElementById('status');
+                status.classList.toggle('bg-green-50');
                 status.classList.toggle('bg-green-100');
-                status.classList.toggle('bg-green-200');
             }, 1000);
         });
     </script>

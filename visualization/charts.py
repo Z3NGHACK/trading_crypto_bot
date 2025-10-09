@@ -1,6 +1,8 @@
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
+from analysis.technical import TechnicalAnalyzer
+
 class ChartVisualizer:
     def __init__(self, df):
         self.df = df
@@ -8,11 +10,11 @@ class ChartVisualizer:
     def plot_full_analysis(self, highs, lows, order_blocks, signals):
         '''Create comprehensive trading chart'''
         fig = make_subplots(
-            rows=3, cols=1,
-            row_heights=[0.6, 0.2, 0.2],
+            rows=4, cols=1,  # Added row for RSI and MACD
+            row_heights=[0.5, 0.2, 0.15, 0.15],
             shared_xaxes=True,
             vertical_spacing=0.05,
-            subplot_titles=('Price & Structure', 'Volume', 'RSI')
+            subplot_titles=('Price & Structure', 'Volume', 'RSI', 'MACD')
         )
         
         # Candlestick chart
@@ -67,10 +69,22 @@ class ChartVisualizer:
             name='Volume'
         ), row=2, col=1)
         
+        # New: RSI
+        ta = TechnicalAnalyzer(self.df)
+        rsi = ta.calculate_rsi()
+        fig.add_trace(go.Scatter(x=self.df.index, y=rsi, name='RSI', line=dict(color='purple')), row=3, col=1)
+        fig.add_hline(y=70, line_dash="dash", line_color="red", row=3, col=1)
+        fig.add_hline(y=30, line_dash="dash", line_color="green", row=3, col=1)
+        
+        # New: MACD
+        macd, signal = ta.calculate_macd()
+        fig.add_trace(go.Scatter(x=self.df.index, y=macd, name='MACD', line=dict(color='blue')), row=4, col=1)
+        fig.add_trace(go.Scatter(x=self.df.index, y=signal, name='Signal', line=dict(color='orange')), row=4, col=1)
+        
         fig.update_layout(
             title='Trading Bot Analysis',
             xaxis_rangeslider_visible=False,
-            height=800
+            height=1000  # Increased for new subplots
         )
         
         return fig

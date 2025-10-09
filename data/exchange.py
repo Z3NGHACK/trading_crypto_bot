@@ -30,3 +30,11 @@ class ExchangeConnector:
         except Exception as e:
             print(f"Error fetching balance: {e}")
             return None
+    
+    def fetch_order_book(self, symbol, limit=10):
+        '''Fetch order book for order flow analysis'''
+        try:
+            return self.exchange.fetch_order_book(symbol, limit=limit)
+        except Exception as e:
+            print(f"Error fetching order book for {symbol}: {e}")
+            return None

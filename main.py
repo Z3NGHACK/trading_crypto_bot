@@ -23,6 +23,7 @@ from data.exchange import ExchangeConnector
 from strategy.risk_management import RiskManager
 from execution.portfolio import Portfolio
 from execution.trader import Trader
+from strategy.signals import SignalGenerator
 
 # Setup configuration
 LEVERAGE = get_leverage()
@@ -59,10 +60,36 @@ class TradingBot:
         self.risk_manager = RiskManager(initial_capital)
         self.portfolio = Portfolio(initial_capital)
         self.trader = Trader(self.exchange, self.risk_manager)
+        self.signal_generator = SignalGenerator()  # Add this line
         self.running = False
         self.initial_capital = initial_capital
+        self.sentiment_cache = {}
+        self.last_sentiment_fetch = 0
+        self.sentiment_interval = 900
+        
+        # Initialize ML model
+        self.ml_predictors = {}
+        for symbol in TRADING_PAIRS:
+            try:
+                from analysis.ml_predictor import MLPredictor
+                ohlcv = self.exchange.fetch_ohlcv(symbol, PRIMARY_TIMEFRAME, limit=500)
+                if ohlcv and len(ohlcv) >= 50:
+                    df = pd.DataFrame(
+                        ohlcv, columns=["timestamp", "open", "high", "low", "close", "volume"]
+                    )
+                    df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms")
+                    df.set_index("timestamp", inplace=True)
+                    mlp = MLPredictor(df, model_path=f'models/rf_model_{symbol.replace("/", "_")}.pkl')
+                    if not mlp.is_fitted:
+                        mlp.train_model()
+                    self.ml_predictors[symbol] = mlp
+                    logging.info(f"Initialized ML predictor for {symbol}")
+                else:
+                    logging.warning(f"Insufficient data to initialize ML predictor for {symbol}")
+            except Exception as e:
+                logging.error(f"Error initializing ML predictor for {symbol}: {e}")
 
-        # Log configuration - FIXED: No emojis
+        # Log configuration
         logging.info("=== Trading Bot Configuration ===")
         logging.info(f"Trading Pairs: {TRADING_PAIRS}")
         logging.info(f"Primary Timeframe: {PRIMARY_TIMEFRAME}")
@@ -77,7 +104,7 @@ class TradingBot:
     def analyze_market(self, symbol, timeframe):
         """Analyze market for a specific symbol and timeframe"""
         logging.info(f"Analyzing {symbol} on {timeframe}...")
-
+        
         try:
             # Fetch OHLCV data
             ohlcv = self.exchange.fetch_ohlcv(symbol, timeframe)
@@ -95,9 +122,88 @@ class TradingBot:
             df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms")
             df.set_index("timestamp", inplace=True)
 
-            # Simple signal generation (replace with your actual logic)
-            signal = self.generate_simple_signal(df, symbol)
+            # Perform analysis
+            from analysis.technical import TechnicalAnalyzer
+            from analysis.structure import MarketStructure
+            from analysis.orderblock import OrderBlockDetector
+            from analysis.volume import VolumeAnalyzer
+            from analysis.fibonacci import FibonacciAnalyzer
+            from analysis.orderflow import OrderFlowAnalyzer
+            SentimentAnalyzer = None
+            try:
+                from analysis.sentiment import SentimentAnalyzer
+            except ImportError as e:
+                logging.warning(f"Sentiment analysis unavailable for {symbol}: {e}")
 
+            tech = TechnicalAnalyzer(df)
+            df['ema_20'] = tech.calculate_ema(20)
+            df['ema_50'] = tech.calculate_ema(50)
+            df['rsi'] = tech.calculate_rsi()
+            df['atr'] = tech.calculate_atr()
+
+            structure = MarketStructure(df)
+            highs, lows = structure.find_swing_points()
+            trend = structure.detect_trend(highs, lows)
+            breakout = structure.detect_breakout(df['close'].iloc[-1], *structure.get_support_resistance(highs, lows))
+            bos_choch = structure.detect_bos_choch(highs, lows, df['close'].iloc[-1])
+
+            ob_detector = OrderBlockDetector(df)
+            bullish_obs = ob_detector.detect_bullish_order_blocks()
+            bearish_obs = ob_detector.detect_bearish_order_blocks()
+
+            volume = VolumeAnalyzer(df)
+            volume_spike = volume.detect_volume_spike()
+            obv_div = volume.detect_obv_divergence()
+
+            fib = FibonacciAnalyzer(df)
+            fib_levels = fib.get_current_levels(highs, lows)
+            fib_rev = fib.predict_reversal(df['close'].iloc[-1], fib_levels)
+
+            # ML prediction with error handling
+            ml_pred = ('neutral', 0.5)
+            try:
+                mlp = self.ml_predictors.get(symbol)
+                if mlp:
+                    ml_pred = mlp.predict_next()
+                else:
+                    logging.warning(f"No ML predictor available for {symbol}")
+            except Exception as e:
+                logging.warning(f"ML prediction failed for {symbol}: {e}")
+
+            ofa = OrderFlowAnalyzer(self.exchange.exchange, symbol)
+            imbalance = ofa.calculate_imbalance()
+
+            # Sentiment analysis with caching
+            current_time = time.time()
+            sentiment = self.sentiment_cache.get(symbol, ('neutral', 0))
+            if SentimentAnalyzer and (symbol not in self.sentiment_cache or current_time - self.last_sentiment_fetch > self.sentiment_interval):
+                try:
+                    sent = SentimentAnalyzer(symbol.split('/')[0], news_api_key=os.getenv('NEWS_API_KEY'))
+                    sentiment = sent.analyze_news_sentiment()
+                    self.sentiment_cache[symbol] = sentiment
+                    self.last_sentiment_fetch = current_time
+                except Exception as e:
+                    logging.warning(f"Sentiment analysis failed for {symbol}: {e}")
+                    sentiment = ('neutral', 0)
+
+            analysis = {
+                'trend': trend,
+                'bullish_order_blocks': bullish_obs,
+                'bearish_order_blocks': bearish_obs,
+                'volume_spike': volume_spike,
+                'breakout': breakout,
+                'highs': highs,
+                'lows': lows,
+                'bos_choch': bos_choch,
+                'obv_div': obv_div,
+                'fib_rev': fib_rev,
+                'ml_pred': ml_pred,
+                'sentiment': sentiment,
+                'imbalance': imbalance
+            }
+
+            # Generate signal
+            signal = self.signal_generator.generate_signal(df, analysis, tech, self.exchange.exchange, symbol)
             # Calculate trade parameters
             entry_price = latest_price
             if signal["signal"] == "BUY":
@@ -134,7 +240,7 @@ class TradingBot:
                 f"SL={sl:.2f}|TP={tp:.2f}|Leverage={LEVERAGE}x|"
                 f"Conf={signal['confidence']*100:.0f}%|"
                 f"MarketSize={market_size:.2f}|Moving={moving_info}|"
-                f"Reasons={signal['reason']}\n"
+                f"Reasons={'; '.join(signal['reasons'])}\n"
             )
 
             try:
@@ -166,28 +272,9 @@ class TradingBot:
             return None
 
     def generate_simple_signal(self, df, symbol):
-        """Simple signal generation (replace with your actual strategy)"""
-        # This is a placeholder - replace with your actual signal logic
-        current_price = df["close"].iloc[-1]
-        prev_price = df["close"].iloc[-2] if len(df) > 1 else current_price
-
-        price_change = (current_price - prev_price) / prev_price
-
-        # Simple strategy based on price movement
-        if price_change > 0.005:  # 0.5% increase
-            return {"signal": "BUY", "confidence": 0.75, "reason": "Bullish momentum"}
-        elif price_change < -0.005:  # 0.5% decrease
-            return {"signal": "SELL", "confidence": 0.75, "reason": "Bearish momentum"}
-        elif price_change > 0.002:  # 0.2% increase
-            return {"signal": "BUY", "confidence": 0.65, "reason": "Slight bullish"}  # Increased to 0.65
-        elif price_change < -0.002:  # 0.2% decrease
-            return {"signal": "SELL", "confidence": 0.65, "reason": "Slight bearish"}  # Increased to 0.65
-        else:
-            return {
-                "signal": "HOLD",
-                "confidence": 0.3,
-                "reason": "No significant movement",
-            }
+        """Fallback simple signal (not used now)"""
+        # Removed as we use full generate_signal
+        pass
 
     def execute_trade(self, analysis_result):
         """Execute trade based on analysis result"""
@@ -217,7 +304,7 @@ class TradingBot:
                 logging.info(f"Market Size: ${analysis_result['market_size']:.2f}")
                 logging.info(f"Stop Loss: ${analysis_result['stop_loss']:.2f}")
                 logging.info(f"Take Profit: ${analysis_result['take_profit']:.2f}")
-                logging.info(f"Reason: {signal['reason']}")
+                logging.info(f"Reasons: {'; '.join(signal['reasons'])}")
                 return trade
         else:
             if signal["signal"] in ["BUY", "SELL"]:
