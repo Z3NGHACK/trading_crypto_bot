@@ -27,13 +27,13 @@ PRIMARY_TIMEFRAME = "15m"
 ANALYSIS_INTERVAL = 60  # seconds
 
 # Risk Management
-MAX_POSITION_RISK = 0.02  # 2% of portfolio per trade
-MAX_OPEN_TRADES = 3
+MAX_POSITION_RISK = 1  # 2% of portfolio per trade
+MAX_OPEN_TRADES = 100
 MAX_PORTFOLIO_RISK = 0.06  # 6% total portfolio risk
 STOP_LOSS_ATR_MULTIPLIER = 2.0
 TAKE_PROFIT_RATIO = 2.0  # Risk:Reward ratio
-LEVERAGE = 10
-MAX_LEVERAGE = 20
+LEVERAGE = 50
+MAX_LEVERAGE = 100
 
 # Strategy Parameters
 ORDER_BLOCK_LOOKBACK = 50

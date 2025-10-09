@@ -4,7 +4,7 @@ from strategy.risk_management import RiskManager
 from execution.portfolio import Portfolio
 
 class BacktestEngine:
-    def __init__(self, df, initial_capital=10000):
+    def __init__(self, df, initial_capital=100):
         self.df = df
         self.capital = initial_capital
         self.portfolio = Portfolio(initial_capital)

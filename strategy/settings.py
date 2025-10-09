@@ -15,12 +15,12 @@ TIMEFRAMES = ['5m', '15m', '1h', '4h']
 PRIMARY_TIMEFRAME = '15m'
 
 # Risk Management
-MAX_POSITION_SIZE = 0.02
-STOP_LOSS_PERCENT = 0.02
-TAKE_PROFIT_PERCENT = 0.04
-MAX_OPEN_TRADES = 3
-MIN_RISK_REWARD_RATIO = 2.0
-LEVERAGE = 1  # 1x for spot; increase for futures (if switched)
+MAX_POSITION_SIZE = 0.2  # 20% of portfolio per trade
+STOP_LOSS_PERCENT = 0.02  # 2% stop loss
+TAKE_PROFIT_PERCENT = 0.04 # 4% take profit
+MAX_OPEN_TRADES = 100 # Increased to allow more trades
+MIN_RISK_REWARD_RATIO = 2.0 # Minimum 2:1 risk-reward ratio
+LEVERAGE = 50  # 1x for spot; increase for futures (if switched)
 
 # Strategy Parameters
 MIN_VOLUME_RATIO = 1.5

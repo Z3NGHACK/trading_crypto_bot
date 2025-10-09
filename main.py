@@ -26,8 +26,8 @@ from execution.trader import Trader
 
 # Setup configuration
 LEVERAGE = get_leverage()
-STOP_LOSS_PERCENT = STOP_LOSS_ATR_MULTIPLIER * 0.01
-TAKE_PROFIT_PERCENT = TAKE_PROFIT_RATIO * STOP_LOSS_PERCENT
+STOP_LOSS_PERCENT = STOP_LOSS_ATR_MULTIPLIER * 0.04  # Example: 4 ATR = 4 * 1% = 4%
+TAKE_PROFIT_PERCENT = TAKE_PROFIT_RATIO * STOP_LOSS_PERCENT # e.g., 2:1 ratio
 
 # Setup logging - FIXED: No emojis, proper encoding
 os.makedirs("logs", exist_ok=True)
@@ -54,7 +54,7 @@ except Exception as e:
 
 
 class TradingBot:
-    def __init__(self, initial_capital=10000):
+    def __init__(self, initial_capital=100):
         self.exchange = ExchangeConnector()
         self.risk_manager = RiskManager(initial_capital)
         self.portfolio = Portfolio(initial_capital)
@@ -318,7 +318,7 @@ if __name__ == "__main__":
         logging.info("All imports successful")
         
         # Create bot and run
-        bot = TradingBot(initial_capital=10000)
+        bot = TradingBot(initial_capital=100)
         bot.run()
         
     except ImportError as e:
